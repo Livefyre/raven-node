@@ -9,7 +9,7 @@
     "debugging",
     "exceptions"
   ],
-  "version": "0.7.2",
+  "version": "0.9.0",
   "repository": "git://github.com/getsentry/raven-node.git",
   "author": "Matt Robenolt <matt@ydekproductions.com>",
   "license": "BSD",
@@ -22,7 +22,7 @@
     "test": "NODE_ENV=test mocha --reporter dot && NODE_ENV=test coffee ./test/run.coffee"
   },
   "engines": {
-    "node": ">= 0.6.0"
+    "node": ">= 0.8.0"
   },
   "dependencies": {
     "cookie": "0.1.0",

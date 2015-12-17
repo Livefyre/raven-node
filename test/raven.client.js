@@ -97,18 +97,24 @@ describe('raven.Client', function(){
         delete process.env.SENTRY_NAME;
     });
 
-    it('should pull SENTRY_SITE from environment', function(){
-        process.env.SENTRY_SITE='Googlez';
-        var client = new raven.Client(dsn);
-        delete process.env.SENTRY_SITE;
-    });
-
     it('should be disabled for a falsey DSN', function(){
         mockConsoleWarn();
         var client = new raven.Client(false);
         client._enabled.should.eql(false);
         console.warn._called.should.eql(false);
         restoreConsoleWarn();
+    });
+
+    it('should pull release from options if present', function(){
+        var client = new raven.Client(dsn, { release: 'version1' });
+        client.release.should.eql('version1');
+    });
+
+    it('should pull SENTRY_RELEASE from environment', function(){
+        process.env.SENTRY_RELEASE='version1';
+        var client = new raven.Client(dsn);
+        client.release.should.eql('version1');
+        delete process.env.SENTRY_RELEASE;
     });
 
     describe('#getIdent()', function(){
@@ -124,7 +130,7 @@ describe('raven.Client', function(){
         it('should send a plain text message to Sentry server', function(done){
             var scope = nock('https://app.getsentry.com')
                 .filteringRequestBody(/.*/, '*')
-                .post('/api/store/', '*')
+                .post('/api/269/store/', '*')
                 .reply(200, 'OK');
 
             client.on('logged', function(){
@@ -137,7 +143,7 @@ describe('raven.Client', function(){
         it('should emit error when request returns non 200', function(done){
             var scope = nock('https://app.getsentry.com')
                 .filteringRequestBody(/.*/, '*')
-                .post('/api/store/', '*')
+                .post('/api/269/store/', '*')
                 .reply(500, 'Oops!');
 
             client.on('error', function(){
@@ -150,7 +156,7 @@ describe('raven.Client', function(){
         it('shouldn\'t shit it\'s pants when error is emitted without a listener', function(){
             var scope = nock('https://app.getsentry.com')
                 .filteringRequestBody(/.*/, '*')
-                .post('/api/store/', '*')
+                .post('/api/269/store/', '*')
                 .reply(500, 'Oops!');
 
             client.captureMessage('Hey!');
@@ -159,7 +165,7 @@ describe('raven.Client', function(){
         it('should attach an Error object when emitting error', function(done){
             var scope = nock('https://app.getsentry.com')
                 .filteringRequestBody(/.*/, '*')
-                .post('/api/store/', '*')
+                .post('/api/269/store/', '*')
                 .reply(500, 'Oops!', {'x-sentry-error': 'Oops!'});
 
             client.on('error', function(e){
@@ -178,7 +184,7 @@ describe('raven.Client', function(){
         it('should send an Error to Sentry server', function(done){
             var scope = nock('https://app.getsentry.com')
                 .filteringRequestBody(/.*/, '*')
-                .post('/api/store/', '*')
+                .post('/api/269/store/', '*')
                 .reply(200, 'OK');
 
             client.on('logged', function(){
@@ -205,7 +211,7 @@ describe('raven.Client', function(){
         it('should send an Error to Sentry server on another port', function(done){
             var scope = nock('https://app.getsentry.com:8443')
                 .filteringRequestBody(/.*/, '*')
-                .post('/api/store/', '*')
+                .post('/api/269/store/', '*')
                 .reply(200, 'OK');
 
             var dsn = 'https://public:private@app.getsentry.com:8443/269';
@@ -233,7 +239,7 @@ describe('raven.Client', function(){
             // See: https://github.com/mattrobenolt/raven-node/pull/46
             var scope = nock('https://app.getsentry.com')
                 .filteringRequestBody(/.*/, '*')
-                .post('/api/store/', '*')
+                .post('/api/269/store/', '*')
                 .reply(200, 'OK');
 
             client.on('logged', function(){
@@ -248,27 +254,37 @@ describe('raven.Client', function(){
     });
 
     describe('#patchGlobal()', function(){
+        beforeEach(function () {
+            // remove existing uncaughtException handlers
+            this.uncaughtBefore = process.listeners('uncaughtException');
+            process.removeAllListeners('uncaughtException');
+        });
+
+        afterEach(function () {
+            var uncaughtBefore = this.uncaughtBefore;
+            // restore things to how they were
+            for (var i = 0; i < uncaughtBefore.length; i++) {
+                process.addListener('uncaughtException', uncaughtBefore[i]);
+            }
+        });
+
         it('should add itself to the uncaughtException event list', function(){
-            var before = process._events.uncaughtException.length;
+            var listeners = process.listeners('uncaughtException');
+            listeners.length.should.equal(0);
+
             client.patchGlobal();
-            process._events.uncaughtException.length.should.equal(before+1);
-            process._events.uncaughtException.pop(); // patch it back to what it was
+
+            listeners = process.listeners('uncaughtException');
+            listeners.length.should.equal(1);
         });
 
         it('should send an uncaughtException to Sentry server', function(done){
             var scope = nock('https://app.getsentry.com')
                 .filteringRequestBody(/.*/, '*')
-                .post('/api/store/', '*')
+                .post('/api/269/store/', '*')
                 .reply(200, 'OK');
 
-            // remove existing uncaughtException handlers
-            var before = process._events.uncaughtException;
-            process.removeAllListeners('uncaughtException');
-
             client.on('logged', function(){
-                // restore things to how they were
-                process._events.uncaughtException = before;
-
                 scope.done();
                 done();
             });
@@ -279,17 +295,10 @@ describe('raven.Client', function(){
         it('should trigger a callback after an uncaughtException', function(done){
             var scope = nock('https://app.getsentry.com')
                 .filteringRequestBody(/.*/, '*')
-                .post('/api/store/', '*')
+                .post('/api/269/store/', '*')
                 .reply(200, 'OK');
 
-            // remove existing uncaughtException handlers
-            var before = process._events.uncaughtException;
-            process.removeAllListeners('uncaughtException');
-
             client.patchGlobal(function(){
-                // restore things to how they were
-                process._events.uncaughtException = before;
-
                 scope.done();
                 done();
             });
@@ -297,10 +306,6 @@ describe('raven.Client', function(){
         });
 
         it('should not enter in recursion when an error is thrown on client request', function(done){
-            // remove existing uncaughtException handlers
-            var uncaughtBefore = process._events.uncaughtException;
-            process.removeAllListeners('uncaughtException');
-
             var transportBefore = client.transport.send;
 
             client.transport.send = function() {
@@ -312,8 +317,6 @@ describe('raven.Client', function(){
                 err.should.be.instanceOf(Error);
                 err.message.should.equal('foo');
 
-                // restore things to how they were
-                process._events.uncaughtException = uncaughtBefore;
                 client.transport.send = transportBefore;
 
                 done();
@@ -328,7 +331,7 @@ describe('raven.Client', function(){
         it('should respect dataCallback', function(){
             var scope = nock('https://app.getsentry.com')
                 .filteringRequestBody(/.*/, '*')
-                .post('/api/store/', '*')
+                .post('/api/269/store/', '*')
                 .reply(200, function(uri, body) {
                     zlib.inflate(new Buffer(body, 'base64'), function(err, dec) {
                       if (err) return done(err);
@@ -380,7 +383,7 @@ describe('raven.Client', function(){
 
         var scope = nock('https://app.getsentry.com')
             .filteringRequestBody(/.*/, '*')
-            .post('/some/path/api/store/', '*')
+            .post('/some/path/api/269/store/', '*')
             .reply(200, 'OK');
 
         client.on('logged', function(){
@@ -393,7 +396,7 @@ describe('raven.Client', function(){
     it('should capture module information', function(done) {
         var scope = nock('https://app.getsentry.com')
         .filteringRequestBody(/.*/, '*')
-        .post('/api/store/', '*')
+        .post('/api/269/store/', '*')
         .reply(200, function(uri, body) {
             zlib.inflate(new Buffer(body, 'base64'), function(err, dec) {
               if (err) return done(err);
@@ -416,7 +419,7 @@ describe('raven.Client', function(){
     it('should capture extra data', function(done) {
         var scope = nock('https://app.getsentry.com')
         .filteringRequestBody(/.*/, '*')
-        .post('/api/store/', '*')
+        .post('/api/269/store/', '*')
         .reply(200, function(uri, body) {
             zlib.inflate(new Buffer(body, 'base64'), function(err, dec) {
               if (err) return done(err);
@@ -440,7 +443,7 @@ describe('raven.Client', function(){
     it('should capture tags', function(done) {
         var scope = nock('https://app.getsentry.com')
         .filteringRequestBody(/.*/, '*')
-        .post('/api/store/', '*')
+        .post('/api/269/store/', '*')
         .reply(200, function(uri, body) {
             zlib.inflate(new Buffer(body, 'base64'), function(err, dec) {
               if (err) return done(err);
@@ -460,6 +463,49 @@ describe('raven.Client', function(){
         });
         client.process({message: 'test', tags: {key: 'value'}});
     });
+    it('should capture fingerprint', function(done) {
+        var scope = nock('https://app.getsentry.com')
+        .filteringRequestBody(/.*/, '*')
+        .post('/api/269/store/', '*')
+        .reply(200, function(uri, body) {
+            zlib.inflate(new Buffer(body, 'base64'), function(err, dec) {
+              if (err) return done(err);
+              var msg = JSON.parse(dec.toString());
 
+              msg.fingerprint.length.should.equal(1);
+              msg.fingerprint[0].should.equal('foo');
+
+              done();
+            });
+            return 'OK';
+        });
+
+        client.on('logged', function(){
+            scope.done();
+        });
+        client.process({message: 'test', fingerprint: ['foo']});
+    });
+    it('should capture release', function(done) {
+        var scope = nock('https://app.getsentry.com')
+        .filteringRequestBody(/.*/, '*')
+        .post('/api/269/store/', '*')
+        .reply(200, function(uri, body) {
+            zlib.inflate(new Buffer(body, 'base64'), function(err, dec) {
+              if (err) return done(err);
+              var msg = JSON.parse(dec.toString());
+
+              msg.release.should.equal('version1');
+
+              done();
+            });
+            return 'OK';
+        });
+
+        var client = new raven.Client(dsn, { release: 'version1' });
+        client.on('logged', function(){
+            scope.done();
+        });
+        client.process({message: 'test'});
+    });
 });
 

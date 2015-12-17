@@ -1,3 +1,30 @@
+# 0.9.0 - 11/23/2015
+ * Always coerce req.body to string. [See 2061d4efbf269c5e2096f2b7b55f5af2249c4aa7]
+ * Allow passing options to HTTP transports. [See #123]
+ * Fixed tests for node 4.0/5.0
+ * Don't send a body for GET/HEAD requests unless one has been passed. [See 0476a6e9818135b8b258b0be0724c369fe30e3c7]
+
+# 0.8.1 - 06/15/2015
+ * Fixed a missing `domain` import in the Express/Connect middleware [See #120]
+
+# 0.8.0 - 06/15/2015
+ * Drop support for node 0.6
+ * Remove `SENTRY_SITE` environment variable usage
+ * Fixed `express deprecated req.host: Use req.hostname instead` warning [See #101]
+ * Allow passing custom `ca` options for an https request [See #110 #108]
+ * Use newer API endpoint [See #105]
+ * Added support for Sentry's new Releases feature
+ * Update Express/Connect middleware to support domains [See #116]
+
+# 0.7.3 - 03/05/2015
+ * When calling `captureError` without an Error, generate a fake `Error` object to pull stacktrace from. [See #87]
+ * Prevent `patchGlobal` from causing recursion [See #84]
+ * Fixed issues arond capturing tags.
+ * Removed deprecated `site` parameter.
+ * Allow explicitly declaring the `culprit` [See #107]
+ * Publicly export out the various parsers [See #111]
+ * Support for iojs and node 0.12
+
 # 0.7.2 - 09/09/2014
  * Added `dataCallback` option to Client configuration. See: https://github.com/getsentry/raven-node#pre-processing-data
 

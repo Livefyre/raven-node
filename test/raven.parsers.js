@@ -58,7 +58,7 @@ describe('raven.parsers', function(){
       it('should detect headers via `req.headers`', function(){
         var mockReq = {
           method: 'GET',
-          host: 'mattrobenolt.com',
+          hostname: 'mattrobenolt.com',
           url: '/some/path?key=value',
           headers: {
             foo: 'bar'
@@ -73,7 +73,7 @@ describe('raven.parsers', function(){
       it('should detect headers via `req.header`', function(){
         var mockReq = {
           method: 'GET',
-          host: 'mattrobenolt.com',
+          hostname: 'mattrobenolt.com',
           url: '/some/path?key=value',
           header: {
             foo: 'bar'
@@ -90,7 +90,7 @@ describe('raven.parsers', function(){
       it('should detect method via `req.method`', function(){
         var mockReq = {
           method: 'GET',
-          host: 'mattrobenolt.com',
+          hostname: 'mattrobenolt.com',
           url: '/some/path?key=value'
         };
 
@@ -101,7 +101,19 @@ describe('raven.parsers', function(){
     });
 
     describe('`host` detection', function() {
-      it('should detect host via `req.host`', function(){
+      it('should detect host via `req.hostname`', function(){
+        var mockReq = {
+          method: 'GET',
+          hostname: 'mattrobenolt.com',
+          url: '/some/path?key=value'
+        };
+
+        var parsed = raven.parsers.parseRequest(mockReq);
+
+        parsed['request'].url.should.equal('http://mattrobenolt.com/some/path?key=value');
+      });
+
+      it('should detect host via deprecated `req.host`', function(){
         var mockReq = {
           method: 'GET',
           host: 'mattrobenolt.com',
@@ -243,7 +255,7 @@ describe('raven.parsers', function(){
       it('should detect query via `req.query`', function(){
         var mockReq = {
           method: 'GET',
-          host: 'mattrobenolt.com',
+          hostname: 'mattrobenolt.com',
           url: '/some/path?key=value',
           query: { some: 'key' }
         };
@@ -256,7 +268,7 @@ describe('raven.parsers', function(){
       it('should detect query via `req.url`', function(){
         var mockReq = {
           method: 'GET',
-          host: 'mattrobenolt.com',
+          hostname: 'mattrobenolt.com',
           url: '/some/path?foo=bar',
         };
 
@@ -272,7 +284,7 @@ describe('raven.parsers', function(){
           method: 'GET',
           url: '/some/path?key=value',
           headers: {
-            host: 'mattrobenolt.com',
+            hostname: 'mattrobenolt.com',
           },
           ip: '69.69.69.69'
         };
@@ -287,7 +299,7 @@ describe('raven.parsers', function(){
           method: 'GET',
           url: '/some/path?key=value',
           headers: {
-            host: 'mattrobenolt.com',
+            hostname: 'mattrobenolt.com',
           },
           connection: {
             remoteAddress: '69.69.69.69'
@@ -305,7 +317,7 @@ describe('raven.parsers', function(){
         var mockReq = {
           method: 'GET',
           protocol: 'https',
-          host: 'mattrobenolt.com',
+          hostname: 'mattrobenolt.com',
           originalUrl: '/some/path?key=value'
         };
 
@@ -318,7 +330,7 @@ describe('raven.parsers', function(){
         var mockReq = {
           method: 'GET',
           protocol: 'https',
-          host: 'mattrobenolt.com',
+          hostname: 'mattrobenolt.com',
           url: '/some/path?key=value'
         };
 
@@ -332,7 +344,7 @@ describe('raven.parsers', function(){
       it('should detect body via `req.body`', function(){
         var mockReq = {
           method: 'GET',
-          host: 'mattrobenolt.com',
+          hostname: 'mattrobenolt.com',
           url: '/some/path?key=value',
           body: 'foo=bar'
         };
@@ -344,15 +356,38 @@ describe('raven.parsers', function(){
 
       it('should fallback to <unavailable> if body is not available', function(){
         var mockReq = {
-          method: 'GET',
-          host: 'mattrobenolt.com',
+          method: 'POST',
+          hostname: 'mattrobenolt.com',
           url: '/some/path?key=value',
-          body: ''
         };
 
         var parsed = raven.parsers.parseRequest(mockReq);
 
         parsed['request'].data.should.equal('<unavailable>');
+      });
+
+      it('should not fallback to <unavailable> if GET', function(){
+        var mockReq = {
+          method: 'GET',
+          hostname: 'mattrobenolt.com',
+          url: '/some/path?key=value',
+        };
+
+        var parsed = raven.parsers.parseRequest(mockReq);
+
+        (typeof parsed['request'].data === 'undefined').should.be.ok;
+      });
+
+      it('should make sure that body is a string', function(){
+        var mockReq = {
+          method: 'POST',
+          hostname: 'mattrobenolt.com',
+          url: '/some/path?key=value',
+          body: {'foo': true}
+        };
+
+        var parsed = raven.parsers.parseRequest(mockReq);
+        parsed['request'].data.should.equal('{\"foo\":true}');
       });
     });
   });
@@ -401,6 +436,17 @@ describe('raven.parsers', function(){
           parsed['exception'][0]['type'].should.equal('Error');
           parsed['exception'][0]['value'].should.equal('Derp');
           parsed['exception'][0]['stacktrace'].should.have.property('frames');
+          done();
+        });
+      }
+    });
+
+    it('should allow specifying a custom `culprit`', function(done){
+      try {
+        throw new Error('Foobar');
+      } catch(e) {
+        raven.parsers.parseError(e, { culprit:'foobar' }, function(parsed){
+          parsed.culprit.should.equal('foobar');
           done();
         });
       }
